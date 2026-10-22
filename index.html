@@ -187,6 +187,7 @@ function gateNote(msg){ const n = $('#gateNote'); n.textContent = msg; n.classLi
 function onCredential(res){
   if (!res || !res.credential) return;
   TOKEN = res.credential;
+  saveTok(TOKEN);
   gateNote('');
   api('bootstrap').then(b => {
     BOOT = b;
@@ -209,27 +210,64 @@ function onCredential(res){
   });
 }
 
+/* No auto_select and no prompt(): Google's silent FedCM re-auth path is rate
+   limited to once per 10 minutes, and when it aborts it kills the visible
+   sign-in with it. The rendered button alone is reliable. Instead we remember
+   the pass ourselves until it expires, so sign-in is rare. */
 function startGsi(){
   if (!(window.google && google.accounts && google.accounts.id)) return setTimeout(startGsi, 150);
   google.accounts.id.initialize({
     client_id: CLIENT_ID,
     callback: onCredential,
-    auto_select: true,
-    cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: true
+    auto_select: false,
+    cancel_on_tap_outside: true,
+    ux_mode: 'popup'
   });
   google.accounts.id.renderButton($('#gbtn'),
     { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', width: 260 });
-  google.accounts.id.prompt();
 }
-startGsi();
+
+/* Reuse a pass that has not expired yet. The server re-verifies it with Google
+   on every call regardless, so a stale or edited one simply gets refused. */
+const TKEY = 'money_tok';
+function tokenLife(t){
+  try {
+    const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return (Number(p.exp) * 1000) - Date.now();
+  } catch (e) { return -1; }
+}
+function saveTok(t){ try { localStorage.setItem(TKEY, t); } catch (e) {} }
+function clearTok(){ try { localStorage.removeItem(TKEY); } catch (e) {} }
+function loadTok(){
+  try {
+    const t = localStorage.getItem(TKEY);
+    return (t && tokenLife(t) > 120000) ? t : null;   // need 2 min of life left
+  } catch (e) { return null; }
+}
 
 function signOutAndRetry(){
   TOKEN = null;
-  $('#gate').classList.remove('hide');
-  gateNote('Your sign-in expired. Tap to sign in again.');
-  if (window.google && google.accounts && google.accounts.id) google.accounts.id.prompt();
+  clearTok();
+  const g = $('#gate');
+  g.classList.remove('hide');
+  g.style.display = '';
+  gateNote('Your sign-in expired. Tap the button to sign in again.');
 }
+
+/* On open: try the remembered pass first, fall back to the button. */
+(function boot(){
+  startGsi();
+  const t = loadTok();
+  if (!t) return;
+  TOKEN = t;
+  api('bootstrap').then(b => {
+    BOOT = b;
+    try { initAdd(); } catch (err) { return; }
+    const g = $('#gate');
+    g.classList.add('hide');
+    g.style.display = 'none';
+  }).catch(() => { TOKEN = null; clearTok(); });
+})();
 
 /* ------------------------- transport ------------------------- */
 /* text/plain keeps this a "simple" CORS request, which is the only kind an
