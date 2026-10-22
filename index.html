@@ -69,6 +69,9 @@ nav .ico{display:block;font-size:19px;margin-bottom:1px}
 .pos{color:var(--good)} .neg{color:var(--bad)} .warnc{color:var(--warn)}
 .t{font-variant-numeric:tabular-nums}
 .hide{display:none}
+/* #gate sets display:flex via an ID selector, which outranks .hide — without
+   this rule the sign-in panel never goes away after a successful sign-in. */
+#gate.hide{display:none}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--ink);
   color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;
   opacity:0;transition:opacity .2s;z-index:50;pointer-events:none;max-width:88vw;text-align:center}
@@ -186,8 +189,16 @@ function onCredential(res){
   TOKEN = res.credential;
   gateNote('');
   api('bootstrap').then(b => {
-    BOOT = b; initAdd();
-    $('#gate').classList.add('hide');
+    BOOT = b;
+    try {
+      initAdd();
+    } catch (err) {
+      gateNote('Signed in, but the form would not draw: ' + err.message);
+      return;
+    }
+    const g = $('#gate');
+    g.classList.add('hide');
+    g.style.display = 'none';   // belt and braces
   }).catch(err => {
     TOKEN = null;
     gateNote(err.message === 'auth'
