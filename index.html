@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Money</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Money">
+<meta name="theme-color" content="#F5F7F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F141A" media="(prefers-color-scheme: dark)">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --ink:#16202B; --ink2:#556472; --muted:#8A97A4; --line:#E3E8ED;
+  --bg:#F5F7F9; --card:#FFFFFF; --accent:#1F6FB2; --good:#2C6A4B; --bad:#A0332A;
+  --warn:#B4751A;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --ink:#E6EBF0; --ink2:#A7B3BF; --muted:#7D8A96; --line:#28313B;
+         --bg:#0F141A; --card:#171E26; --accent:#4A93D2; --good:#6FBF95; --bad:#E0736A;
+         --warn:#E0A952; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);min-height:100%;
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:env(safe-area-inset-top) 0 78px}
+.wrap{max-width:560px;margin:0 auto;padding:14px 14px 0}
+h1{font-size:19px;margin:4px 0 14px;font-weight:650}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.muted{color:var(--muted);font-size:12.5px}
+.big{font-size:30px;font-weight:700;letter-spacing:-.02em}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase}
+input,select,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--ink);font-size:16px;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+#amount{font-size:34px;font-weight:700;text-align:center;padding:16px;letter-spacing:-.02em}
+.seg{display:flex;gap:6px;margin-bottom:4px}
+.seg button{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);
+  color:var(--ink2);border-radius:10px;font-size:14px;font-weight:600}
+.seg button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+.chip{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);
+  font-size:13.5px;color:var(--ink2)}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn{width:100%;padding:15px;border:0;border-radius:12px;background:var(--accent);color:#fff;
+  font-size:16px;font-weight:650;margin-top:16px}
+.btn:active{opacity:.85}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500;
+  padding:10px;font-size:13px;margin-top:8px}
+.btn.sm{padding:11px;font-size:14px;margin-top:12px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);
+  border-top:1px solid var(--line);padding:7px 0 max(7px,env(safe-area-inset-bottom))}
+nav button{flex:1;border:0;background:none;color:var(--muted);font-size:11.5px;font-weight:600;padding:5px 0}
+nav button.on{color:var(--accent)}
+nav .ico{display:block;font-size:19px;margin-bottom:1px}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar i.over{background:var(--bad)}
+.item{padding:11px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.pos{color:var(--good)} .neg{color:var(--bad)} .warnc{color:var(--warn)}
+.t{font-variant-numeric:tabular-nums}
+.hide{display:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--ink);
+  color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;
+  opacity:0;transition:opacity .2s;z-index:50;pointer-events:none;max-width:88vw;text-align:center}
+.toast.show{opacity:1}
+.del{background:none;border:0;color:var(--muted);font-size:17px;padding:0 4px}
+.spin{text-align:center;color:var(--muted);padding:34px 0;font-size:14px}
+.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;
+  letter-spacing:.03em;text-transform:uppercase}
+.pill.ok{background:rgba(44,106,75,.13);color:var(--good)}
+.pill.wait{background:rgba(180,117,26,.15);color:var(--warn)}
+/* sign-in gate */
+#gate{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
+#gate h2{font-size:22px;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+#gate p{color:var(--muted);font-size:13.5px;margin:0 0 26px;max-width:300px;line-height:1.5}
+#gbtn{min-height:44px;display:flex;justify-content:center}
+#gateNote{margin-top:22px;font-size:12px;color:var(--muted);max-width:300px}
+.mark{width:64px;height:64px;border-radius:18px;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:700;
+  letter-spacing:-.02em;margin-bottom:18px}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="mark">RM</div>
+  <h2>Money</h2>
+  <p>Sign in with the Google account that owns the spreadsheet.</p>
+  <div id="gbtn"></div>
+  <div id="gateNote" class="hide"></div>
+</div>
+
+<div class="wrap">
+  <!-- ============ ADD ============ -->
+  <section id="v-add">
+    <h1>Log it</h1>
+    <div class="card">
+      <div class="seg" id="typeSeg">
+        <button data-t="expense" class="on">Spend</button>
+        <button data-t="income">Income</button>
+        <button data-t="transfer">Move</button>
+      </div>
+      <input id="amount" type="number" inputmode="decimal" placeholder="0.00" step="0.01">
+      <div id="catWrap">
+        <label>Category</label>
+        <div class="chips" id="cats"></div>
+      </div>
+      <button class="btn ghost" id="moreBtn">More options</button>
+      <div id="more" class="hide">
+        <label id="accLbl">Paid from</label>
+        <select id="account"></select>
+        <div id="toWrap" class="hide">
+          <label>Into</label>
+          <select id="toAccount"></select>
+        </div>
+        <label>Date</label>
+        <input id="date" type="date">
+        <label>Note</label>
+        <input id="note" type="text" placeholder="optional">
+      </div>
+      <button class="btn" id="save">Save</button>
+    </div>
+  </section>
+
+  <!-- ============ MONTH ============ -->
+  <section id="v-month" class="hide">
+    <h1>This month</h1>
+    <div id="recBody"></div>
+    <div id="monthBody"><div class="spin">Loading…</div></div>
+  </section>
+
+  <!-- ============ FUNDS ============ -->
+  <section id="v-funds" class="hide">
+    <h1>Lumpy bills</h1>
+    <div id="fundsBody"><div class="spin">Loading…</div></div>
+  </section>
+
+  <!-- ============ DEBTS ============ -->
+  <section id="v-debts" class="hide">
+    <h1>Debt countdown</h1>
+    <div id="debtsBody"><div class="spin">Loading…</div></div>
+  </section>
+</div>
+
+<nav>
+  <button data-v="add" class="on"><span class="ico">＋</span>Add</button>
+  <button data-v="month"><span class="ico">◴</span>Month</button>
+  <button data-v="funds"><span class="ico">◇</span>Funds</button>
+  <button data-v="debts"><span class="ico">↓</span>Debts</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================ FILL THIS IN ============================ */
+/* 1. The /exec URL of your Apps Script deployment. */
+const ENDPOINT  = 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE';
+/* 2. The OAuth client ID from Google Cloud Console. Same one as in Code.gs. */
+const CLIENT_ID = 'PASTE_YOUR_CLIENT_ID_HERE';
+/* ===================================================================== */
+
+let BOOT = null, TYPE = 'expense', CAT = '', TOKEN = null;
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const money  = n => (n < 0 ? '−' : '') + 'RM' + Math.abs(n || 0)
+  .toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money0 = n => (n < 0 ? '−' : '') + 'RM' + Math.round(Math.abs(n || 0)).toLocaleString('en-MY');
+function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1900); }
+
+/* ------------------------- sign in ------------------------- */
+function gateNote(msg){ const n = $('#gateNote'); n.textContent = msg; n.classList.toggle('hide', !msg); }
+
+function onCredential(res){
+  if (!res || !res.credential) return;
+  TOKEN = res.credential;
+  gateNote('');
+  api('bootstrap').then(b => {
+    BOOT = b; initAdd();
+    $('#gate').classList.add('hide');
+  }).catch(err => {
+    TOKEN = null;
+    gateNote(err.message === 'auth'
+      ? 'That account cannot open this app. Sign in with the account that owns the spreadsheet.'
+      : (err.message === 'no_owner'
+        ? 'Run setOwner() once in the Apps Script editor, then try again.'
+        : 'Could not reach the sheet: ' + err.message));
+  });
+}
+
+function startGsi(){
+  if (!(window.google && google.accounts && google.accounts.id)) return setTimeout(startGsi, 150);
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    callback: onCredential,
+    auto_select: true,
+    cancel_on_tap_outside: false,
+    use_fedcm_for_prompt: true
+  });
+  google.accounts.id.renderButton($('#gbtn'),
+    { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', width: 260 });
+  google.accounts.id.prompt();
+}
+startGsi();
+
+function signOutAndRetry(){
+  TOKEN = null;
+  $('#gate').classList.remove('hide');
+  gateNote('Your sign-in expired. Tap to sign in again.');
+  if (window.google && google.accounts && google.accounts.id) google.accounts.id.prompt();
+}
+
+/* ------------------------- transport ------------------------- */
+/* text/plain keeps this a "simple" CORS request, which is the only kind an
+   Apps Script web app can answer — it cannot reply to a preflight. */
+function api(action, args){
+  if (!TOKEN) return Promise.reject(new Error('auth'));
+  return fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ token: TOKEN, action: action, args: args || {} }),
+    redirect: 'follow'
+  })
+  .then(r => r.json())
+  .then(j => {
+    if (!j.ok) {
+      if (j.error === 'auth') signOutAndRetry();
+      throw new Error(j.error || 'failed');
+    }
+    return j.data;
+  });
+}
+
+/* ------------------------- add ------------------------- */
+function initAdd(){
+  $('#date').value = BOOT.today;
+  const fill = (el, arr) => el.innerHTML = arr.map(a => `<option>${a}</option>`).join('');
+  fill($('#account'), BOOT.accounts); fill($('#toAccount'), BOOT.accounts);
+  if (BOOT.accounts.length > 1) $('#toAccount').selectedIndex = 1;
+  renderCats();
+}
+function renderCats(){
+  const list = TYPE === 'income' ? BOOT.incomeCats : BOOT.expenseCats;
+  CAT = list[0] || '';
+  $('#catWrap').classList.toggle('hide', TYPE === 'transfer');
+  $('#cats').innerHTML = list.map((c, i) =>
+    `<button class="chip${i === 0 ? ' on' : ''}" data-c="${c}">${c}</button>`).join('');
+  $$('#cats .chip').forEach(b => b.onclick = () => {
+    $$('#cats .chip').forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); CAT = b.dataset.c;
+  });
+}
+$$('#typeSeg button').forEach(b => b.onclick = () => {
+  $$('#typeSeg button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  TYPE = b.dataset.t; renderCats();
+  $('#toWrap').classList.toggle('hide', TYPE !== 'transfer');
+  $('#accLbl').textContent = TYPE === 'income' ? 'Received into'
+    : (TYPE === 'transfer' ? 'Out of' : 'Paid from');
+  if (TYPE === 'transfer') $('#more').classList.remove('hide');
+});
+$('#moreBtn').onclick = () => $('#more').classList.toggle('hide');
+
+$('#save').onclick = () => {
+  const amt = parseFloat($('#amount').value);
+  if (!amt || amt <= 0) { toast('Enter an amount'); return; }
+  if (TYPE === 'transfer' && $('#account').value === $('#toAccount').value) {
+    toast('Pick two different accounts'); return;
+  }
+  const tx = { type: TYPE, amount: amt, category: TYPE === 'transfer' ? '' : CAT,
+    account: $('#account').value, toAccount: TYPE === 'transfer' ? $('#toAccount').value : '',
+    date: $('#date').value, note: $('#note').value };
+  $('#save').disabled = true; $('#save').textContent = 'Saving…';
+  const done = () => { $('#save').disabled = false; $('#save').textContent = 'Save'; };
+  api('addTx', tx).then(() => {
+    $('#amount').value = ''; $('#note').value = ''; done();
+    toast('Saved'); if (navigator.vibrate) navigator.vibrate(8);
+  }).catch(e => { done(); toast(e.message === 'auth' ? 'Sign in again' : 'Failed — not saved'); });
+};
+
+/* ------------------------- navigation ------------------------- */
+$$('nav button').forEach(b => b.onclick = () => {
+  $$('nav button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  const v = b.dataset.v;
+  ['add','month','funds','debts'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== v));
+  if (v === 'month') loadMonth();
+  if (v === 'funds') loadFunds();
+  if (v === 'debts') loadDebts();
+});
+const fail = el => e => { $(el).innerHTML =
+  `<div class="spin">${e.message === 'auth' ? 'Sign in again' : 'Could not load'}</div>`; };
+
+/* ------------------------- month ------------------------- */
+function loadMonth(){
+  $('#monthBody').innerHTML = '<div class="spin">Loading…</div>';
+  api('monthView').then(renderMonth).catch(fail('#monthBody'));
+  api('recurringView').then(renderRec).catch(() => $('#recBody').innerHTML = '');
+}
+function renderMonth(m){
+  const pct = m.emergencyGoal ? Math.min(100, 100 * m.savingsBalance / m.emergencyGoal) : 0;
+  let h = `<div class="card">
+    <div class="muted">Spent this month</div>
+    <div class="big t">${money0(m.expense)}</div>
+    <div class="row" style="margin-top:10px">
+      <div><div class="muted">In</div><div class="t pos">${money0(m.income)}</div></div>
+      <div style="text-align:right"><div class="muted">Net</div>
+        <div class="t ${m.net >= 0 ? 'pos' : 'neg'}">${money0(m.net)}</div></div>
+    </div></div>
+
+    <div class="card">
+      <div class="row"><strong>Saving</strong>
+        <span class="muted">target ${money0(m.saveTarget)}</span></div>
+      <div class="row" style="margin-top:6px">
+        <span class="t ${m.savedThisMonth >= m.saveTarget ? 'pos' : 'warnc'}">${money0(m.savedThisMonth)} this month</span>
+        <span class="t muted">${money0(m.savingsBalance)} saved</span>
+      </div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="muted" style="margin-top:6px">${Math.round(pct)}% of your ${money0(m.emergencyGoal)} emergency fund</div>
+    </div>`;
+
+  h += `<div class="card"><strong>Where it went</strong>`;
+  if (!m.categories.length) h += `<div class="muted" style="margin-top:8px">Nothing logged yet.</div>`;
+  m.categories.forEach(c => {
+    const p = c.budget ? Math.min(100, 100 * c.spent / c.budget) : 0, over = c.budget && c.spent > c.budget;
+    h += `<div class="item"><div class="row"><span>${c.name}</span>
+      <span class="t ${over ? 'neg' : ''}">${money0(c.spent)}${c.budget ? ` <span class="muted">/ ${money0(c.budget)}</span>` : ''}</span></div>
+      ${c.budget ? `<div class="bar"><i class="${over ? 'over' : ''}" style="width:${p}%"></i></div>` : ''}</div>`;
+  });
+  h += `</div>`;
+
+  h += `<div class="card"><strong>Recent</strong>`;
+  m.recent.slice(0, 25).forEach(r => {
+    const sign = r.type === 'income' ? '+' : (r.type === 'transfer' ? '→' : '−');
+    const cls  = r.type === 'income' ? 'pos' : (r.type === 'transfer' ? 'muted' : '');
+    h += `<div class="item"><div class="row">
+      <div><div>${r.category || r.toAccount || 'Transfer'}</div>
+      <div class="muted">${r.date} · ${r.account || ''}${r.note ? ' · ' + r.note : ''}</div></div>
+      <div class="row" style="gap:4px"><span class="t ${cls}">${sign}${money0(r.amount)}</span>
+      <button class="del" data-del="${r.id}">×</button></div></div></div>`;
+  });
+  h += `</div>`;
+  $('#monthBody').innerHTML = h;
+  $$('#monthBody .del').forEach(b => b.onclick = () => del(b.dataset.del));
+}
+function del(id){
+  if (!confirm('Delete this entry?')) return;
+  api('deleteTx', { id: id }).then(() => { toast('Deleted'); loadMonth(); })
+    .catch(() => toast('Could not delete'));
+}
+
+/* ------------------------- fixed monthly income ------------------------- */
+function renderRec(r){
+  if (!r || !r.ready || !r.rules.length) { $('#recBody').innerHTML = ''; return; }
+  const active = r.rules.filter(x => x.active);
+  const total  = active.reduce((a, x) => a + x.amount, 0);
+  let h = `<div class="card">
+    <div class="row"><strong>Fixed monthly income</strong>
+      ${r.pending ? `<span class="pill wait">${r.pending} waiting</span>`
+                  : `<span class="pill ok">In</span>`}</div>
+    <div class="big t" style="margin-top:6px">${money0(total)}</div>`;
+  active.forEach(x => {
+    h += `<div class="item"><div class="row"><span>${x.name}</span>
+      <span class="t ${x.posted ? 'pos' : 'muted'}">${money0(x.amount)}</span></div>
+      <div class="muted">Paid ${x.day} · counts as ${x.fundsMonth} money${x.posted ? '' : ` · next ${x.nextOn}`}</div>
+      </div>`;
+  });
+  h += `<div class="muted" style="margin-top:10px">Posts itself every payday. ${
+      r.pending ? `${money0(r.pendingTotal)} has not landed yet.` : 'This month is already in.'}</div>`;
+  if (r.pending) h += `<button class="btn sm" id="postNow">Post it now</button>`;
+  h += `</div>`;
+  $('#recBody').innerHTML = h;
+  const b = $('#postNow');
+  if (b) b.onclick = () => {
+    b.disabled = true; b.textContent = 'Posting…';
+    api('postNow').then(() => { toast('Income posted'); loadMonth(); })
+      .catch(() => { b.disabled = false; b.textContent = 'Post it now'; toast('Failed'); });
+  };
+}
+
+/* ------------------------- funds ------------------------- */
+function loadFunds(){
+  $('#fundsBody').innerHTML = '<div class="spin">Loading…</div>';
+  api('fundsView').then(renderFunds).catch(fail('#fundsBody'));
+}
+function renderFunds(f){
+  const ok = f.gap >= 0;
+  let h = `<div class="card">
+    <div class="muted">Set aside every month</div>
+    <div class="big t">${money(f.perMonthTotal)}</div>
+    <div class="muted" style="margin-top:8px">Standing instruction into “${f.account}” on payday.</div>
+  </div>
+  <div class="card">
+    <div class="row"><strong>Fund balance</strong><span class="t">${money0(f.balance)}</span></div>
+    <div class="row" style="margin-top:6px"><span class="muted">Should be by now</span>
+      <span class="t muted">${money0(f.shouldHave)}</span></div>
+    <div class="row" style="margin-top:6px"><span class="muted">${ok ? 'Ahead by' : 'Behind by'}</span>
+      <span class="t ${ok ? 'pos' : 'neg'}">${money0(Math.abs(f.gap))}</span></div>
+  </div>
+  <div class="card"><strong>What is coming</strong>`;
+  f.items.forEach(i => {
+    const soon = i.monthsToDue !== null && i.monthsToDue <= 2;
+    h += `<div class="item"><div class="row"><span>${i.item}</span>
+      <span class="t ${soon ? 'warnc' : ''}">${money0(i.amount)}</span></div>
+      <div class="muted">${money(i.perMonth)}/mo · due ${i.nextDue}${soon ? ' · soon' : ''}</div></div>`;
+  });
+  h += `</div>`;
+  $('#fundsBody').innerHTML = h;
+}
+
+/* ------------------------- debts ------------------------- */
+function loadDebts(){
+  $('#debtsBody').innerHTML = '<div class="spin">Loading…</div>';
+  api('debtsView').then(renderDebts).catch(fail('#debtsBody'));
+}
+function renderDebts(d){
+  let h = `<div class="card">
+    <div class="muted">Going out every month</div>
+    <div class="big t">${money0(d.monthlyNow)}</div>
+    <div class="muted" style="margin-top:8px">${money0(d.totalRemaining)} left in total</div>
+    ${d.nextFree ? `<div class="muted" style="margin-top:6px">Next to clear: <strong>${d.nextFree.name}</strong>
+      — ${d.nextFree.monthsLeft} months, frees ${money(d.nextFree.monthly)}/mo</div>` : ''}
+  </div>
+  <div class="card"><strong>Every debt</strong>`;
+  d.debts.forEach(x => {
+    h += `<div class="item"><div class="row">
+      <span style="${x.done ? 'opacity:.45;text-decoration:line-through' : ''}">${x.name}</span>
+      <span class="t">${money(x.monthly)}</span></div>
+      <div class="muted">${x.done ? 'Cleared' : `${x.monthsLeft} months left · ends ${x.endsOn} · ${money0(x.remaining)} to go`}</div>
+      </div>`;
+  });
+  h += `</div>
+  <div class="card"><div class="muted">When a debt ends, raise your savings target by that amount.
+  You were already living without the money.</div></div>`;
+  $('#debtsBody').innerHTML = h;
+}
+
+/* ------------------------- service worker ------------------------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
