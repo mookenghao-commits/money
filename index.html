@@ -143,6 +143,12 @@ nav .ico{display:block;font-size:19px;margin-bottom:1px}
     <div id="monthBody"><div class="spin">Loading…</div></div>
   </section>
 
+  <!-- ============ PLAN ============ -->
+  <section id="v-plan" class="hide">
+    <h1>The plan</h1>
+    <div id="planBody"><div class="spin">Loading…</div></div>
+  </section>
+
   <!-- ============ FUNDS ============ -->
   <section id="v-funds" class="hide">
     <h1>Lumpy bills</h1>
@@ -159,6 +165,7 @@ nav .ico{display:block;font-size:19px;margin-bottom:1px}
 <nav>
   <button data-v="add" class="on"><span class="ico">＋</span>Add</button>
   <button data-v="month"><span class="ico">◴</span>Month</button>
+  <button data-v="plan"><span class="ico">◎</span>Plan</button>
   <button data-v="funds"><span class="ico">◇</span>Funds</button>
   <button data-v="debts"><span class="ico">↓</span>Debts</button>
 </nav>
@@ -340,8 +347,9 @@ $('#save').onclick = () => {
 $$('nav button').forEach(b => b.onclick = () => {
   $$('nav button').forEach(x => x.classList.remove('on')); b.classList.add('on');
   const v = b.dataset.v;
-  ['add','month','funds','debts'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== v));
+  ['add','month','plan','funds','debts'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== v));
   if (v === 'month') loadMonth();
+  if (v === 'plan')  loadPlan();
   if (v === 'funds') loadFunds();
   if (v === 'debts') loadDebts();
 });
@@ -433,6 +441,87 @@ function renderRec(r){
     api('postNow').then(() => { toast('Income posted'); loadMonth(); })
       .catch(() => { b.disabled = false; b.textContent = 'Post it now'; toast('Failed'); });
   };
+}
+
+/* ------------------------- plan ------------------------- */
+function loadPlan(){
+  $('#planBody').innerHTML = '<div class="spin">Loading…</div>';
+  api('planView').then(renderPlan).catch(fail('#planBody'));
+}
+function renderPlan(p){
+  if (!p || !p.ready){
+    $('#planBody').innerHTML =
+      `<div class="card"><div class="muted">No plan yet. Run setupPlan() once in the Apps Script editor.</div></div>`;
+    return;
+  }
+  if (!p.plan){
+    $('#planBody').innerHTML =
+      `<div class="card"><div class="muted">${p.label} is outside the plan, which runs to Mar 2032.</div></div>`;
+    return;
+  }
+
+  const over = p.left < 0;
+  const used = p.allowance ? Math.min(100, 100 * p.spent / p.allowance) : 0;
+
+  /* ---- 1. this month ---- */
+  let h = `<div class="card">
+    <div class="row"><strong>${p.label}</strong>
+      <span class="muted">${p.daysLeft} days left</span></div>
+    <div class="muted" style="margin-top:10px">Left to spend</div>
+    <div class="big t ${over ? 'neg' : ''}">${money0(p.left)}</div>
+    <div class="bar"><i class="${over ? 'over' : ''}" style="width:${used}%"></i></div>
+    <div class="muted" style="margin-top:6px">
+      ${money0(p.spent)} of ${money0(p.allowance)} spent${
+        p.daysLeft > 0 && !over ? ` · ${money0(p.perDay)}/day from here` : ''}</div>
+    <div class="item" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <div class="row"><span class="muted">Income</span>
+        <span class="t pos">${money(p.income)}</span></div>
+      <div class="row" style="margin-top:4px"><span class="muted">Goes out by itself</span>
+        <span class="t">−${money(p.committed)}</span></div>
+      <div class="row" style="margin-top:4px"><span class="muted">Saving target</span>
+        <span class="t">−${money(p.target)}</span></div>
+      <div class="row" style="margin-top:4px"><span>Yours to spend</span>
+        <span class="t">${money(p.allowance)}</span></div>
+    </div>
+    ${p.plan.lumpy ? `<div class="muted" style="margin-top:10px">
+      Includes a <strong>${money0(p.plan.lumpy)}</strong> bill landing this month.</div>` : ''}
+    ${p.plan.shareTax ? `<div class="muted" style="margin-top:4px">
+      Share tax of ${money0(p.plan.shareTax)} is coming out of your pay.</div>` : ''}
+  </div>`;
+
+  /* ---- 2. saving ---- */
+  const gap = p.saved - p.target;
+  const runGap = p.savedToDate - p.targetToDate;
+  const pct = p.emergencyGoal ? Math.min(100, 100 * p.savingsBalance / p.emergencyGoal) : 0;
+  h += `<div class="card">
+    <div class="row"><strong>Saving</strong>
+      ${gap >= 0 ? `<span class="pill ok">On track</span>`
+                 : `<span class="pill wait">${money0(-gap)} short</span>`}</div>
+    <div class="row" style="margin-top:8px"><span class="muted">Target this month</span>
+      <span class="t">${money(p.target)}</span></div>
+    <div class="row" style="margin-top:4px"><span class="muted">Put aside so far</span>
+      <span class="t ${gap >= 0 ? 'pos' : 'warnc'}">${money(p.saved)}</span></div>
+    <div class="row" style="margin-top:4px"><span class="muted">Since you started</span>
+      <span class="t ${runGap >= 0 ? 'pos' : 'neg'}">${runGap >= 0 ? 'ahead ' : 'behind '}${money0(Math.abs(runGap))}</span></div>
+    <div class="bar" style="margin-top:12px"><i style="width:${pct}%"></i></div>
+    <div class="muted" style="margin-top:6px">Emergency fund ${money0(p.savingsBalance)}
+      of ${money0(p.emergencyGoal)} · ${Math.round(pct)}%</div>
+  </div>`;
+
+  /* ---- 3. year ahead ---- */
+  h += `<div class="card"><strong>Year ahead</strong>
+    <div class="muted" style="margin-top:4px">Months in amber are tight before you save anything.</div>`;
+  p.ahead.forEach((m, i) => {
+    h += `<div class="item"><div class="row">
+      <span${i === 0 ? ' style="font-weight:650"' : ''}>${m.label}${i === 0 ? ' · now' : ''}</span>
+      <span class="t ${m.tight ? 'warnc' : ''}">${m.save ? 'save ' + money0(m.save) : '—'}</span></div>
+      <div class="muted">${m.lumpy ? money0(m.lumpy) + ' bill due · ' : ''}${
+        m.tight ? 'short ' + money0(-m.surplus) + ' before saving'
+                : money0(m.surplus) + ' spare'}</div></div>`;
+  });
+  h += `</div>`;
+
+  $('#planBody').innerHTML = h;
 }
 
 /* ------------------------- funds ------------------------- */
