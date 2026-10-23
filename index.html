@@ -478,13 +478,16 @@ function renderPlan(p){
         <span class="t pos">${money(p.income)}</span></div>
       <div class="row" style="margin-top:4px"><span class="muted">Goes out by itself</span>
         <span class="t">−${money(p.committed)}</span></div>
+      <div class="row" style="margin-top:4px"><span class="muted">&nbsp;&nbsp;of which sinking fund</span>
+        <span class="t muted">${money(p.plan.sinking)}</span></div>
       <div class="row" style="margin-top:4px"><span class="muted">Saving target</span>
         <span class="t">−${money(p.target)}</span></div>
       <div class="row" style="margin-top:4px"><span>Yours to spend</span>
         <span class="t">${money(p.allowance)}</span></div>
     </div>
-    ${p.plan.lumpy ? `<div class="muted" style="margin-top:10px">
-      Includes a <strong>${money0(p.plan.lumpy)}</strong> bill landing this month.</div>` : ''}
+    ${p.plan.bills ? `<div class="muted" style="margin-top:10px">
+      A <strong>${money0(p.plan.bills)}</strong> bill lands this month — already paid for
+      by the ${money0(p.plan.sinking)} you set aside each month, so it is not in the sums above.</div>` : ''}
     ${p.plan.shareTax ? `<div class="muted" style="margin-top:4px">
       Share tax of ${money0(p.plan.shareTax)} is coming out of your pay.</div>` : ''}
   </div>`;
@@ -510,13 +513,14 @@ function renderPlan(p){
 
   /* ---- 3. year ahead ---- */
   h += `<div class="card"><strong>Year ahead</strong>
-    <div class="muted" style="margin-top:4px">Months in amber are tight before you save anything.</div>`;
+    <div class="muted" style="margin-top:4px">Bills shown are covered by the fund — they are
+      not extra. Amber months are tight even so.</div>`;
   p.ahead.forEach((m, i) => {
     h += `<div class="item"><div class="row">
       <span${i === 0 ? ' style="font-weight:650"' : ''}>${m.label}${i === 0 ? ' · now' : ''}</span>
       <span class="t ${m.tight ? 'warnc' : ''}">${m.save ? 'save ' + money0(m.save) : '—'}</span></div>
-      <div class="muted">${m.lumpy ? money0(m.lumpy) + ' bill due · ' : ''}${
-        m.tight ? 'short ' + money0(-m.surplus) + ' before saving'
+      <div class="muted">${m.bills ? money0(m.bills) + ' bill, from the fund · ' : ''}${
+        m.tight ? 'short ' + money0(-m.surplus)
                 : money0(m.surplus) + ' spare'}</div></div>`;
   });
   h += `</div>`;
