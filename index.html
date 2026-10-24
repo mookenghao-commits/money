@@ -65,6 +65,46 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .x{background:none;border:0;color:var(--muted);font-size:19px;padding:0 5px}
 .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);
   border-radius:999px;padding:1px 7px;margin-left:6px}
+
+/* ---- dashboard ----
+   Categorical slots 1-6 validated for both surfaces: worst adjacent CVD
+   deltaE 9.1 light / 8.4 dark, normal-vision 19.6 / 19.3. Three light-mode
+   hues sit under 3:1 on white, so every segment is directly labelled in the
+   legend and the full category list below acts as the table view. */
+:root{
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#8A97A4;
+  --meter:#2a78d6;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+         --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#7D8A96;
+         --meter:#3987e5; }
+}
+.hero{font-size:48px;font-weight:700;letter-spacing:-.03em;line-height:1.05;
+  margin:4px 0 2px}
+.hero.neg{color:var(--bad)}
+@media (max-width:360px){ .hero{font-size:40px} }
+.meter{position:relative;height:14px;border-radius:7px;margin-top:14px;
+  background:var(--line);
+  background:color-mix(in srgb, var(--meter) 16%, transparent);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:7px;background:var(--meter);
+  transition:width .3s}
+/* overlapping mark, so it carries a 2px surface ring and reads on the
+   filled part of the meter as well as the empty track */
+.pace{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);
+  border-radius:1px;box-shadow:0 0 0 2px var(--card)}
+.meter.warn{--meter:var(--warn)} .meter.over{--meter:var(--bad)}
+.state{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:650}
+.state.ok{color:var(--good)} .state.warn{color:var(--warn)} .state.over{color:var(--bad)}
+.stack{display:flex;gap:2px;height:22px;margin:4px 0 2px}
+.stack span{display:block;height:100%}
+.stack span:first-child{border-top-left-radius:4px;border-bottom-left-radius:4px}
+.stack span:last-child{border-top-right-radius:4px;border-bottom-right-radius:4px}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px}
+.key div{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2)}
+.key b{width:9px;height:9px;border-radius:2px;flex:none}
+.key em{font-style:normal;color:var(--muted)}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);
   border-top:1px solid var(--line);padding:7px 0 max(7px,env(safe-area-inset-bottom))}
 nav button{flex:1;border:0;background:none;color:var(--muted);font-size:11.5px;font-weight:600;padding:5px 0}
@@ -483,16 +523,71 @@ function loadMonth(){
   api('monthView').then(renderMonth).catch(fail('#monthBody'));
   api('recurringView').then(renderRec).catch(() => $('#recBody').innerHTML = '');
 }
+/* One ratio against a limit: hero figure + meter. A two-slice pie would say
+   the same thing less precisely, so it isn't one. */
+function meterBlock(m){
+  const allow = m.allowance || 0;
+  if (!allow) return `<div class="muted">No plan for this month, so there is no
+    budget to measure against.</div>`;
+  const spent = m.dailySpent != null ? m.dailySpent : m.expense;
+  const left  = allow - spent;
+  const used  = Math.min(100, 100 * spent / allow);
+  const pace  = m.daysInMonth ? 100 * m.dayOfMonth / m.daysInMonth : 0;
+  const over  = spent > allow;
+  const fast  = !over && used > pace + 5;
+  const cls   = over ? 'over' : (fast ? 'warn' : 'ok');
+  const label = over ? 'Over budget' : (fast ? 'Faster than the month' : 'On pace');
+  const icon  = over ? '▲' : (fast ? '▲' : '●');
+  const perDay = m.daysLeft > 0 ? left / m.daysLeft : 0;
+  return `
+    <div class="meter ${cls === 'ok' ? '' : cls}">
+      <i style="width:${used}%"></i>
+      ${pace > 0 && pace < 100 ? `<div class="pace" style="left:${pace}%"></div>` : ''}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="state ${cls}">${icon} ${label}</span>
+      <span class="muted t">${money0(spent)} of ${money0(allow)}</span>
+    </div>
+    <div class="muted" style="margin-top:6px">${m.daysLeft} days left${
+      m.daysLeft > 0 && left > 0 ? ` · ${money0(perDay)} a day from here` : ''}${
+      pace > 0 && pace < 100 ? ' · the tick is where today sits in the month' : ''}</div>`;
+}
+
+/* Part-to-whole: a horizontal stacked bar, top six then Other.
+   Every segment is directly labelled, which is also the relief the light-mode
+   contrast warning requires. */
+function stackBlock(m){
+  if (!m.categories || !m.categories.length) return '';
+  const tot = m.categories.reduce((a, c) => a + c.spent, 0);
+  if (tot <= 0) return '';
+  const segs = m.categories.slice(0, 6)
+    .map((c, i) => ({ name: c.name, amt: c.spent, col: `var(--s${i + 1})` }));
+  const rest = m.categories.slice(6);
+  if (rest.length) segs.push({ name: 'Other', amt: rest.reduce((a, c) => a + c.spent, 0), col: 'var(--s7)' });
+  const vis = segs.filter(s => s.amt > 0);
+  return `<div class="card"><strong>Where it went</strong>
+    <div class="muted" style="margin-top:4px">${money0(tot)} across ${m.categories.length} categories</div>
+    <div class="stack">${vis.map(s =>
+      `<span style="width:${100 * s.amt / tot}%;background:${s.col}"></span>`).join('')}</div>
+    <div class="key">${vis.map(s =>
+      `<div><b style="background:${s.col}"></b>${s.name}
+        <em>${money0(s.amt)} · ${Math.round(100 * s.amt / tot)}%</em></div>`).join('')}</div>
+  </div>`;
+}
+
 function renderMonth(m){
   const pct = m.emergencyGoal ? Math.min(100, 100 * m.savingsBalance / m.emergencyGoal) : 0;
   let h = `<div class="card">
-    <div class="muted">Spent this month</div>
-    <div class="big t">${money0(m.expense)}</div>
-    <div class="row" style="margin-top:10px">
+    <div class="muted">Left to spend</div>
+    <div class="hero${(m.allowance - (m.dailySpent != null ? m.dailySpent : m.expense)) < 0 ? ' neg' : ''}">${
+      money0(m.allowance - (m.dailySpent != null ? m.dailySpent : m.expense))}</div>
+    ${meterBlock(m)}
+    <div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
       <div><div class="muted">In</div><div class="t pos">${money0(m.income)}</div></div>
-      <div style="text-align:right"><div class="muted">Net</div>
-        <div class="t ${m.net >= 0 ? 'pos' : 'neg'}">${money0(m.net)}</div></div>
+      <div style="text-align:right"><div class="muted">Out</div>
+        <div class="t">${money0(m.expense)}</div></div>
     </div></div>
+  ${stackBlock(m)}
 
     <div class="card">
       <div class="row"><strong>Saving</strong>
@@ -505,7 +600,7 @@ function renderMonth(m){
       <div class="muted" style="margin-top:6px">${Math.round(pct)}% of your ${money0(m.emergencyGoal)} emergency fund</div>
     </div>`;
 
-  h += `<div class="card"><strong>Where it went</strong>`;
+  h += `<div class="card"><strong>Every category</strong>`;
   if (!m.categories.length) h += `<div class="muted" style="margin-top:8px">Nothing logged yet.</div>`;
   m.categories.forEach(c => {
     const p = c.budget ? Math.min(100, 100 * c.spent / c.budget) : 0, over = c.budget && c.spent > c.budget;
